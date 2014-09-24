@@ -1,0 +1,14 @@
+
+Grids is a topographic drum sequencer eurorack module from mutable instruments.
+
+This Grids is a port of the original eurorack module code into a Max for Live device.
+
+this github repo host the code for the C External that is the heart of the module included in the max for live device in the link below.
+
+more info and download : http://motscousus.com/stuff/2014-09_Grids_for_Max4Live/
+
+to compile this code :
+download the Max/Msp SDK at : http://cycling74.com/downloads/sdk/
+put this repository into <SDKFolder>/examples/basics/
+and compile it with visual studio express 2013 or Xcode.
+
