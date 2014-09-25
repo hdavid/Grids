@@ -1,20 +1,14 @@
-/**
-	@file
-	Grids - Topographic Drum Sequencer
-
-	@ingroup	examples	
-*/
 //
-// Grids for Live.
+//     Grids for Max for Live.
 //
 // Port of Mutable Instruments Grids for Max4Live
 //
-// Author: Henri DAVID 2014
+// Author: Henri DAVID
+// 2014
 // https://github.com/hdavids/Grids
 //
 // Based on code of Olivier Gillet (ol.gillet@gmail.com)
-// original code from https://github.com/pichenettes/eurorack/tree/master/grids
-//
+// https://github.com/pichenettes/eurorack/tree/master/grids
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -27,11 +21,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-// TODO : fix euclidian mode.
 
 // The standard random() function is not standard on Windows.
 // We need to do this to setup the rand_s() function.
-
 #ifdef WIN_VERSION
 #define _CRT_RAND_S
 #endif
@@ -40,42 +32,41 @@
 #include "resources.h"
 #include <math.h>
 
-
 typedef struct _grids
 {
-	t_object	ob;
-	t_atom		val;
-	t_symbol	*name;
-    
-    t_uint8 mode;
+	t_object ob;
+	t_atom   val;
+	t_symbol *name;
     
     t_uint8 kNumParts;
-	t_uint8 kStepsPerPattern ;
-	
+    t_uint8 kStepsPerPattern;
+    
+	//parameters
+    t_uint8 mode;
 	t_uint8 map_x;
 	t_uint8 map_y;
 	t_uint8 randomness;
-	
 	t_uint8 euclidean_length[3];
-	t_uint8 part_perturbation[3];
-	t_uint8 density[3] ;
-	t_uint8 euclidean_step[3];
-	t_uint8 velocities[3];
-	
-	t_uint8 step;
-	bool first_beat;
-	bool beat;
-	t_uint8 state;
+    t_uint8 density[3] ;
+    t_uint8 euclidean_step[3];
     
-    void *outlet_kick_gate;
-    void *outlet_snare_gate;
-    void *outlet_hihat_gate;
-    void *outlet_kick_accent_gate;
-    void *outlet_snare_accent_gate;
-    void *outlet_hihat_accent_gate;
+    //running vars
+	t_uint8 part_perturbation[3];
+	t_uint8 step;
+    
+    //output
+    t_uint8 velocities[3];
+    t_uint8 state;
+    
+    //outlets
+    void    *outlet_kick_gate;
+    void    *outlet_snare_gate;
+    void    *outlet_hihat_gate;
+    void    *outlet_kick_accent_gate;
+    void    *outlet_snare_accent_gate;
+    void    *outlet_hihat_accent_gate;
     
 } t_grids;
-
 
 
 void *grids_new(t_symbol *s, long argc, t_atom *argv);
@@ -92,76 +83,72 @@ void grids_in_snare_euclidian_length(t_grids *x, long n);
 void grids_in_hihat_euclidian_length(t_grids *x, long n);
 void grids_in_mode_and_clock(t_grids *x, long n);
 
-t_uint8 grids_read_drum_map(t_grids *grids, t_uint8 instrument);
-void grids_tick_clock(t_grids *grids, t_uint8 playHead);
-void grids_evaluate_drums(t_grids *grids);
-void grids_evaluate_euclidean(t_grids *grids);
+void grids_run(t_grids *grids, long playHead);
+void grids_reset(t_grids *grids);
 void grids_evaluate(t_grids *grids);
-void grids_run(t_grids *grids, t_uint8 playHead);
+void grids_evaluate_drums(t_grids *grids);
+t_uint8 grids_read_drum_map(t_grids *grids, t_uint8 instrument);
+void grids_evaluate_euclidean(t_grids *grids);
 void grids_output (t_grids *grids);
 
 
 void *grids_class;
 
 
-
 void *grids_new(t_symbol *s, long argc, t_atom *argv)
 {
     
-    t_grids *x = NULL;
+    t_grids *grids = NULL;
     
-	if ((x = (t_grids *)object_alloc(grids_class))) {
+	if ((grids = (t_grids *)object_alloc(grids_class))) {
         
         //inlets
         for(t_uint8 i=9;i>0;i--){
-            intin(x, i);
+            intin(grids, i);
         }
         
         //outlets
-        x->outlet_hihat_accent_gate = intout((t_object *)x);
-        x->outlet_snare_accent_gate = intout((t_object *)x);
-        x->outlet_kick_accent_gate = intout((t_object *)x);
-        x->outlet_hihat_gate = intout((t_object *)x);
-        x->outlet_snare_gate = intout((t_object *)x);
-        x->outlet_kick_gate = intout((t_object *)x);
+        grids->outlet_hihat_accent_gate = intout((t_object *)grids);
+        grids->outlet_snare_accent_gate = intout((t_object *)grids);
+        grids->outlet_kick_accent_gate = intout((t_object *)grids);
+        grids->outlet_hihat_gate = intout((t_object *)grids);
+        grids->outlet_snare_gate = intout((t_object *)grids);
+        grids->outlet_kick_gate = intout((t_object *)grids);
         
         //configuration
-        x-> kNumParts = 3;
-        x-> kStepsPerPattern = 32;
+        grids->kNumParts = 3;
+        grids->kStepsPerPattern = 32;
         
         //parameters
-        x-> map_x = 64;
-        x-> map_y = 64;
-        x-> randomness = 10;
-        x-> mode = 0;
-        x-> euclidean_length[0] = 5;
-        x-> euclidean_length[1] = 7;
-        x-> euclidean_length[2] = 11;
-        x-> part_perturbation[0] = 0;
-        x-> part_perturbation[1] = 0;
-        x-> part_perturbation[2] = 0;
-        x-> density[0]=32;
-        x-> density[1]=32;
-        x-> density[2]=32;
-        
-        //runing vars
-        x-> euclidean_step[0] = 0;
-        x-> euclidean_step[1] = 0;
-        x-> euclidean_step[2] = 0;
-        
-        x-> velocities[0] = 0;
-        x-> velocities[1] = 0;
-        x-> velocities[2] = 0;
-        
-        x-> state=0;
-        
-        x-> step=0;
-        x-> first_beat=false;
-        x-> beat=false;
+        grids->map_x = 64;
+        grids->map_y = 64;
+        grids->randomness = 10;
+        grids->mode = 0;
+        grids->euclidean_length[0] = 5;
+        grids->euclidean_length[1] = 7;
+        grids->euclidean_length[2] = 11;
+        grids->density[0]=32;
+        grids->density[1]=32;
+        grids->density[2]=32;
 
+        //runing vars
+        grids->part_perturbation[0] = 0;
+        grids->part_perturbation[1] = 0;
+        grids->part_perturbation[2] = 0;
+        grids->euclidean_step[0] = 0;
+        grids->euclidean_step[1] = 0;
+        grids->euclidean_step[2] = 0;
+        grids->step=0;
+        
+        //output
+        grids->state=0;
+        grids->velocities[0] = 0;
+        grids->velocities[1] = 0;
+        grids->velocities[2] = 0;
+        
 	}
     
-    return x;
+    return grids;
 }
 
 
@@ -170,7 +157,7 @@ int C74_EXPORT main(void)
 	t_class *c;
 	
     //create grids object
-	c = class_new("grids", (method)grids_new, (method)grids_free, (long)sizeof(t_grids), 0L /* leave NULL!! */, A_GIMME, 0);
+	c = class_new("grids", (method)grids_new, (method)grids_free, (long)sizeof(t_grids), 0L, A_GIMME, 0);
 	
     //inlet definition
     class_addmethod(c, (method)grids_in_kick_density,			"in1",		A_LONG, 0);
@@ -201,7 +188,7 @@ void grids_assist(t_grids *x, void *b, long m, long a, char *s)
 {
     if (m == ASSIST_INLET) {	// Inlets
         switch (a) {
-            case 0: sprintf(s, "Not used"); break;
+            case 0: sprintf(s, "Grids not used."); break;
             case 1: sprintf(s, "kick density"); break;
 			case 2: sprintf(s, "snare density"); break;
             case 3: sprintf(s, "hihat density"); break;
@@ -280,35 +267,34 @@ void grids_in_hihat_euclidian_length(t_grids *grids, long n)
 void grids_in_mode_and_clock(t_grids *grids, long n)
 {
     if(n>=0){
-        grids_run(grids,(t_uint8)(n%256));
+        grids_run(grids,n);
     }else{
         if(n==-1){
             grids->mode=0;
-        }else{
+        }if(n==-2){
             grids->mode=1;
+        }if(n==-3){
+            grids_reset(grids);
         }
     }
 }
 
-void grids_run(t_grids *grids, t_uint8 playHead){
-	grids_tick_clock(grids,playHead);
+
+void grids_run(t_grids *grids, long playHead){
+	grids->step = playHead%32;
     grids_evaluate(grids);
 	grids_output(grids);
 }
 
-void grids_tick_clock(t_grids *grids,t_uint8 playHead){
-	
-	grids->step = playHead%32;
-	grids->beat = (grids->step & 0x7) == 0;
-	grids->first_beat = grids->step == 0;
-    
-    if (grids->step & 1) {
-        for (uint8_t i = 0; i < grids->kNumParts; ++i) {
-            ++grids->euclidean_step[i];
-        }
-    }
-    
+void grids_reset(t_grids *grids){
+    grids->euclidean_step[0] = 0;
+    grids->euclidean_step[1] = 0;
+    grids->euclidean_step[2] = 0;
+    grids->step=0;
+    grids->state=0;
+    //object_post((t_object *)grids, "reset");
 }
+
 
 void grids_output (t_grids *grids){
 	if((grids->state & 1)>0){
@@ -356,7 +342,7 @@ void grids_evaluate_drums(t_grids *grids) {
 			t_uint8 rand = random();
 #endif
             t_uint8 rand2 = (t_uint8)(rand%256);
-            grids->part_perturbation[i] = (rand2*randomness)>>8;//U8U8MulShift8(rand, randomness);
+            grids->part_perturbation[i] = (rand2*randomness)>>8;
         }
     }
     
@@ -405,42 +391,38 @@ t_uint8 grids_read_drum_map(t_grids *grids, t_uint8 instrument) {
 	return r;
 }
 
-void grids_evaluate_euclidean(t_grids *grids) {
-    // Refresh only on sixteenth notes.
-    if (grids->step & 1) {
-        return;
-    }
-    
 
-    
-    // Euclidean pattern generation
+void grids_evaluate_euclidean(t_grids *grids) {
+
     t_uint8 instrument_mask = 1;
     t_uint8 reset_bits = 0;
-    for (int i = 0; i < grids->kNumParts; ++i) {
-        grids->velocities[i] = 100;
-        
-        t_uint8 length = grids->euclidean_length[i];//my length is directly the right length. (grids->euclidean_length[i] >> 3) + 1;
-        while (grids->euclidean_step[i] >= length) {
-            grids->euclidean_step[i] -= length;
-        }
-        
-        t_uint8 density = grids->density[i] >> 2;//my density is 127 max. grids->density[i] >> 3;
-        t_uint16 address = (length - 1)* 32 + density;//U8U8Mul(length - 1, 32) + density;
-        while (grids->euclidean_step[i] >= length) {
-            grids->euclidean_step[i] -= length;
-        }
-        t_uint32 step_mask = 1L << (t_uint32)grids->euclidean_step[i];//static_cast<uint32_t>(grids->euclidean_step[i]);//
-        t_uint32 pattern_bits = grids_res_euclidean[address];
-        if (pattern_bits & step_mask) {
-            grids->state |= instrument_mask;
-        }
-        
-        if (grids->euclidean_step[i] == 0) {
-            reset_bits |= instrument_mask;
-        }
-        instrument_mask <<= 1;
-    }
     
+    // Refresh only on sixteenth notes.
+    if (!(grids->step & 1)) {
+        for (int i = 0; i < grids->kNumParts; ++i) {
+            grids->velocities[i] = 100;
+            
+            t_uint8 density = grids->density[i] >> 2;//my density is 127 max. grids->density[i] >> 3;
+            t_uint16 address = (grids->euclidean_length[i] - 1)* 32 + density;
+            t_uint32 step_mask = 1L << (t_uint32)grids->euclidean_step[i];
+            t_uint32 pattern_bits = address<1024?grids_res_euclidean[address]:0;
+           
+            if (pattern_bits & step_mask) {
+                grids->state |= instrument_mask;
+            }
+            
+            
+            if (grids->euclidean_step[i] == 0) {
+                reset_bits |= instrument_mask;
+            }
+            
+            instrument_mask <<= 1;
+            
+            grids->euclidean_step[i]=(grids->euclidean_step[i]+1)%grids->euclidean_length[i];
+          
+        }
+    }
     grids->state |= reset_bits << 3;
+    
 }
 
