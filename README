@@ -7,8 +7,10 @@ this github repo host the code for the C External that is the heart of the modul
 
 more info and download : http://motscousus.com/stuff/2014-09_Grids_for_Max4Live/
 
-to compile this code :
-download the Max/Msp SDK at : http://cycling74.com/downloads/sdk/
-put this repository into <SDKFolder>/examples/basics/
-and compile it with visual studio express 2013 or Xcode.
-
+to compile this code:
+- download the Max/Msp SDK at : http://cycling74.com/downloads/sdk/
+- copy grids folder in max-sdk/sources/basics/
+- create max-sdk/build, from there run `cmake -G Xcode ..` or `cmake -G "Visual Studio 16 2019" `
+- then head to `build/source/basics/grids` and open the xcode or visual studio project
+- compile it
+- your external is `in max-sdk/externals`
